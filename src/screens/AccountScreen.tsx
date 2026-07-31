@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../tokens/ThemeProvider';
 import { typeScale, tabular } from '../tokens/theme';
 import { RollingNumber } from '../components/RollingNumber';
+import { Sheet } from '../components/Sheet';
 import { useTickingPrices, type Instrument } from '../data/instruments';
 
 const BALANCE = 128420.55;
@@ -10,6 +11,7 @@ const BALANCE = 128420.55;
 export function AccountScreen() {
   const { theme } = useTheme();
   const instruments = useTickingPrices();
+  const [selected, setSelected] = useState<Instrument | null>(null);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.ground }]}>
@@ -30,18 +32,32 @@ export function AccountScreen() {
         </View>
 
         {instruments.map((instrument) => (
-          <Row key={instrument.id} instrument={instrument} />
+          <Row key={instrument.id} instrument={instrument} onPress={() => setSelected(instrument)} />
         ))}
       </ScrollView>
+
+      <Sheet visible={!!selected} onClose={() => setSelected(null)}>
+        <View style={styles.sheetContent}>
+          <Text style={[typeScale.sheetTitle, { color: theme.textPrimary }]}>
+            {selected?.name ?? ''}
+          </Text>
+          <Text style={[typeScale.caption, { color: theme.textTertiary }, styles.label]}>
+            {selected?.symbol ?? ''}
+          </Text>
+        </View>
+      </Sheet>
     </View>
   );
 }
 
-function Row({ instrument }: { instrument: Instrument }) {
+function Row({ instrument, onPress }: { instrument: Instrument; onPress: () => void }) {
   const { theme } = useTheme();
 
   return (
-    <Pressable style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
+    >
       <View style={[styles.hairline, { backgroundColor: theme.hairline }]} />
       <View style={styles.rowInner}>
         <View>
@@ -77,4 +93,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 16,
   },
+  sheetContent: { paddingHorizontal: 20, paddingTop: 16 },
 });
