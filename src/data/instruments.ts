@@ -30,14 +30,15 @@ export function useTickingPrices(): Instrument[] {
     const id = setInterval(() => {
       setInstruments((current) =>
         current.map((instrument) => {
-          // Only some rows move on any given tick — all of them at once reads
-          // as a screensaver rather than a market.
-          if (Math.random() > 0.45) return instrument;
+          // Roughly one row per tick. Three rows flashing at once reads as a
+          // screensaver rather than a market, and it makes the individual
+          // flash impossible to actually look at.
+          if (Math.random() > 0.18) return instrument;
           const drift = (Math.random() - 0.5) * 0.004;
           return { ...instrument, price: instrument.price * (1 + drift) };
         }),
       );
-    }, 1400);
+    }, 1800);
     return () => clearInterval(id);
   }, []);
 

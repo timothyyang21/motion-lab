@@ -37,6 +37,19 @@ const TOP = DETENTS[0];
 const PEEK = DETENTS[DETENTS.length - 1];
 const STOPS = [...DETENTS, CLOSED];
 
+/**
+ * The sheet is built taller than the tallest detent needs.
+ *
+ * Rubber-banding moves the sheet's top edge ABOVE the top detent, which drags
+ * its bottom edge up off the bottom of the screen — exposing the scrim behind
+ * it as a strip of the wrong colour. Only visible on a hard drag, which is
+ * exactly the gesture the capture is built around.
+ *
+ * 400px comfortably covers the rubber band's practical range; it asymptotes
+ * long before that. The overhang simply hangs below the screen.
+ */
+const OVERHANG = 400;
+
 type Props = {
   visible: boolean;
   onClose: () => void;
@@ -53,16 +66,22 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
   const lastDetent = useSharedValue(CLOSED);
 
   const spring = reduced ? motion.reduced.springs.sheetSettle : motion.springs.sheetSettle;
+  // Entering and dismissing cover the full screen height. Settling into a
+  // detent covers a couple of hundred points. Same spring for both makes the
+  // long move feel slow, so presentation gets its own, stiffer one.
+  const presentSpring = reduced
+    ? motion.reduced.springs.sheetSettle
+    : motion.springs.sheetPresent;
 
   useEffect(() => {
     if (visible) {
-      translateY.value = withSpring(PEEK, spring);
+      translateY.value = withSpring(PEEK, presentSpring);
       lastDetent.value = PEEK;
     } else {
-      translateY.value = withSpring(CLOSED, spring);
+      translateY.value = withSpring(CLOSED, presentSpring);
       lastDetent.value = CLOSED;
     }
-  }, [visible, spring, translateY, lastDetent]);
+  }, [visible, presentSpring, translateY, lastDetent]);
 
   const fireHaptic = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -157,7 +176,7 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
           style={[
             styles.sheet,
             {
-              height: SCREEN_H - TOP,
+              height: SCREEN_H - TOP + OVERHANG,
               backgroundColor: theme.surfaceRaised,
               // Static shadow. NEVER animate shadowRadius or shadowOpacity —
               // it forces a shadow re-rasterisation every frame and is the

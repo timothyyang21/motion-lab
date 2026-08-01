@@ -20,6 +20,15 @@ const springs = {
   /** Sheet settling into a detent. critical at (200, 1) = 28.28 */
   sheetSettle: { damping: 30, stiffness: 200, mass: 1 },
 
+  /**
+   * Sheet entering from off-screen. Snappier than sheetSettle because the
+   * travel is much longer — the same spring that feels right settling 200px
+   * feels sluggish covering 800px. Presentation should feel immediate;
+   * settling should feel considered.
+   * critical at (340, 1) = 36.88
+   */
+  sheetPresent: { damping: 38, stiffness: 340, mass: 1 },
+
   /** Hold-to-confirm snapping back on early release. critical at (320, 1) = 35.78 */
   confirmCancel: { damping: 38, stiffness: 320, mass: 1 },
 
@@ -62,6 +71,13 @@ export const motion = {
 
   /** Delay between adjacent digits in a roll. */
   digitStaggerMs: 25,
+
+  /**
+   * Price-tick flash attack. Not zero: snapping instantly to full colour is
+   * what makes a tick read as garish. A short rise reads as a pulse rather
+   * than a light switch.
+   */
+  tickAttackMs: 90,
 
   /** Price-tick flash decay. Decays — never persists. */
   tickDecayMs: 600,

@@ -8,7 +8,6 @@ import Animated, {
   withSequence,
   interpolateColor,
   Easing,
-  type SharedValue,
 } from 'react-native-reanimated';
 import { motion } from '../tokens/motion';
 import { useTheme } from '../tokens/ThemeProvider';
@@ -48,40 +47,20 @@ export function RollingNumber({
   const direction = rollDirection(previous.current, value);
   const chars = formatDigits(value, decimals);
 
-  // Flash progress: 0 = resting, 1 = fully flashed. Only 'tick' uses it.
-  const flash = useSharedValue(0);
-  const flashSign = useSharedValue(0);
-
   useEffect(() => {
-    if (variant === 'tick' && direction !== 0) {
-      flashSign.value = direction;
-      const decay = reduced ? motion.reduced.tickDecayMs : motion.tickDecayMs;
-      // Snap to flashed, then decay out. It decays — it never persists.
-      flash.value = withSequence(
-        withTiming(1, { duration: 0 }),
-        withTiming(0, { duration: decay, easing: Easing.out(Easing.quad) }),
-      );
-    }
     previous.current = value;
-  }, [value, variant, direction, reduced, flash, flashSign]);
+  }, [value]);
 
   const stagger = reduced ? motion.reduced.digitStaggerMs : motion.digitStaggerMs;
 
   return (
     <View style={styles.row}>
-      {prefix ? (
-        <Char
-          char={prefix}
-          index={0}
-          direction={0}
-          stagger={0}
-          variant={variant}
-          style={style}
-          reduced={reduced}
-          flash={flash}
-          flashSign={flashSign}
-        />
-      ) : null}
+      {/*
+        The prefix never rolls and never flashes. A currency symbol turning
+        green is noise — it didn't change, and colouring it makes the flash
+        about the row rather than about the digits that moved.
+      */}
+      {prefix ? <Static char={prefix} style={style} /> : null}
       {chars.map((char, index) => (
         <Char
           key={`${index}-${chars.length}`}
@@ -92,10 +71,22 @@ export function RollingNumber({
           variant={variant}
           style={style}
           reduced={reduced}
-          flash={flash}
-          flashSign={flashSign}
         />
       ))}
+    </View>
+  );
+}
+
+function Static({ char, style }: { char: string; style?: TextStyle }) {
+  const { theme } = useTheme();
+  const fontSize = style?.fontSize ?? 15;
+  return (
+    <View style={{ height: fontSize * 1.25, justifyContent: 'center' }}>
+      <Animated.Text
+        style={[style, tabular, { color: (style?.color as string) ?? theme.textPrimary }]}
+      >
+        {char}
+      </Animated.Text>
     </View>
   );
 }
@@ -108,8 +99,6 @@ function Char({
   variant,
   style,
   reduced,
-  flash,
-  flashSign,
 }: {
   char: string;
   index: number;
@@ -118,25 +107,27 @@ function Char({
   variant: Variant;
   style?: TextStyle;
   reduced: boolean;
-  flash: SharedValue<number>;
-  flashSign: SharedValue<number>;
 }) {
   const { theme } = useTheme();
   const offset = useSharedValue(0);
   const opacity = useSharedValue(1);
+  // Flash is per-character, not per-number. Only the digits that actually
+  // changed carry colour — which is what makes a tick read as information
+  // rather than as decoration.
+  const flash = useSharedValue(0);
+  const flashSign = useSharedValue(0);
   const previousChar = useRef(char);
 
   const fontSize = style?.fontSize ?? 15;
   const lineHeight = fontSize * 1.25;
 
   useEffect(() => {
-    if (previousChar.current === char || direction === 0) {
-      previousChar.current = char;
-      return;
-    }
+    const changed = previousChar.current !== char;
     previousChar.current = char;
 
-    // Separators never roll — only digits carry motion.
+    if (!changed || direction === 0) return;
+
+    // Separators never roll and never flash — only digits carry motion.
     if (!/\d/.test(char)) return;
 
     const travel = reduced ? lineHeight * motion.reduced.travelScale : lineHeight;
@@ -151,7 +142,36 @@ function Char({
       withTiming(0, { duration, easing: Easing.out(Easing.cubic) }),
     );
     opacity.value = withDelay(index * stagger, withTiming(1, { duration: duration * 0.7 }));
-  }, [char, direction, index, stagger, variant, reduced, lineHeight, offset, opacity]);
+
+    if (variant === 'tick') {
+      flashSign.value = direction;
+      const attack = reduced ? 0 : motion.tickAttackMs;
+      const decay = reduced ? motion.reduced.tickDecayMs : motion.tickDecayMs;
+      // Rise, then decay. The rise is short but non-zero — snapping straight
+      // to full colour is what reads as garish. Decays, never persists.
+      flash.value = withDelay(
+        index * stagger,
+        withSequence(
+          withTiming(1, { duration: attack, easing: Easing.out(Easing.quad) }),
+          withTiming(0, { duration: decay, easing: Easing.out(Easing.quad) }),
+        ),
+      );
+    }
+  }, [
+    char,
+    direction,
+    index,
+    stagger,
+    variant,
+    reduced,
+    lineHeight,
+    offset,
+    opacity,
+    flash,
+    flashSign,
+  ]);
+
+  const baseColor = (style?.color as string) ?? theme.textPrimary;
 
   const animatedStyle = useAnimatedStyle(() => {
     const color =
@@ -159,12 +179,9 @@ function Char({
         ? interpolateColor(
             flash.value,
             [0, 1],
-            [
-              (style?.color as string) ?? theme.textPrimary,
-              flashSign.value >= 0 ? theme.flashUp : theme.flashDown,
-            ],
+            [baseColor, flashSign.value >= 0 ? theme.flashUp : theme.flashDown],
           )
-        : ((style?.color as string) ?? theme.textPrimary);
+        : baseColor;
 
     return {
       color,
