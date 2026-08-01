@@ -5,6 +5,9 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useDerivedValue,
+  useAnimatedRef,
+  useAnimatedScrollHandler,
+  scrollTo,
   withSpring,
   cancelAnimation,
   runOnJS,
@@ -65,6 +68,24 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
   const gestureStart = useSharedValue(0);
   const lastDetent = useSharedValue(CLOSED);
 
+  const scrollRef = useAnimatedRef<Animated.ScrollView>();
+  const scrollY = useSharedValue(0);
+  /**
+   * Once the pan takes ownership of a gesture it keeps it until the finger
+   * lifts. Re-arbitrating every frame is what produces the stutter frame that
+   * makes most implementations of this feel broken — the sheet and the scroll
+   * view take turns claiming the same drag, and the user feels the seam.
+   */
+  const panOwnsGesture = useSharedValue(false);
+
+  const scrollHandler = useAnimatedScrollHandler({
+    onScroll: (event) => {
+      scrollY.value = event.contentOffset.y;
+    },
+  });
+
+  const atTopDetent = useDerivedValue(() => Math.abs(translateY.value - TOP) < 1);
+
   const spring = reduced ? motion.reduced.springs.sheetSettle : motion.springs.sheetSettle;
   // Entering and dismissing cover the full screen height. Settling into a
   // detent covers a couple of hundred points. Same spring for both makes the
@@ -87,7 +108,10 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  const nativeScroll = Gesture.Native();
+
   const pan = Gesture.Pan()
+    .simultaneousWithExternalGesture(nativeScroll)
     .onStart(() => {
       // Interruption.
       //
@@ -98,8 +122,36 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
       // dead under the finger and then lurch.
       cancelAnimation(translateY);
       gestureStart.value = translateY.value;
+      panOwnsGesture.value = false;
     })
     .onUpdate((event) => {
+      // The handoff.
+      //
+      // At the top detent the CONTENT owns vertical motion — the user is
+      // reading, not dragging. The sheet only takes over when the content has
+      // nothing left to give: scrolled to the top AND still being pulled down.
+      //
+      // While the content owns the gesture we keep re-basing gestureStart
+      // against the live translation, so at the instant of handoff the sheet
+      // starts moving from exactly where it already is. Without that re-base
+      // the sheet jumps by however far the finger travelled while scrolling.
+      if (!panOwnsGesture.value) {
+        const contentStillOwnsIt =
+          atTopDetent.value && !(scrollY.value <= 0 && event.translationY > 0);
+
+        if (contentStillOwnsIt) {
+          gestureStart.value = translateY.value - event.translationY;
+          return;
+        }
+        panOwnsGesture.value = true;
+      }
+
+      // Pin the content to the top while the sheet itself is moving, so
+      // releasing never strands the list mid-scroll behind a travelling sheet.
+      if (!atTopDetent.value) {
+        scrollTo(scrollRef, 0, 0, false);
+      }
+
       const raw = gestureStart.value + event.translationY;
 
       if (raw < TOP) {
@@ -111,6 +163,11 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
       }
     })
     .onEnd((event) => {
+      // A gesture the content owned end to end was a scroll, not a drag.
+      // Snapping detents off it would fight the user's scroll momentum.
+      if (!panOwnsGesture.value) return;
+      panOwnsGesture.value = false;
+
       // The whole argument, in four lines.
       //
       // Tuned: project where this flick would come to rest, then snap to the
@@ -191,7 +248,24 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
           ]}
         >
           <View style={[styles.handle, { backgroundColor: theme.accent }]} />
-          {children}
+          <GestureDetector gesture={nativeScroll}>
+            <Animated.ScrollView
+              ref={scrollRef}
+              onScroll={scrollHandler}
+              scrollEventThrottle={16}
+              /*
+               * Required, not stylistic. iOS bounce lets contentOffset.y go
+               * negative, which makes `scrollY <= 0` true while the content is
+               * still rubber-banding — so the handoff fires early, and often
+               * twice in one gesture.
+               */
+              bounces={false}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.scrollContent}
+            >
+              {children}
+            </Animated.ScrollView>
+          </GestureDetector>
         </Animated.View>
       </GestureDetector>
     </>
@@ -208,6 +282,8 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     overflow: 'hidden',
   },
+  // Pads past the bottom of the screen so the overhang never shows content.
+  scrollContent: { paddingBottom: OVERHANG + 40 },
   handle: {
     width: 36,
     height: 4,
