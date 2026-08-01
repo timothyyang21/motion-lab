@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View, type TextStyle } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -77,11 +77,14 @@ export function RollingNumber({
   );
 }
 
+function slotHeight(style?: TextStyle) {
+  return (style?.fontSize ?? 15) * 1.25;
+}
+
 function Static({ char, style }: { char: string; style?: TextStyle }) {
   const { theme } = useTheme();
-  const fontSize = style?.fontSize ?? 15;
   return (
-    <View style={{ height: fontSize * 1.25, justifyContent: 'center' }}>
+    <View style={{ height: slotHeight(style), justifyContent: 'center' }}>
       <Animated.Text
         style={[style, tabular, { color: (style?.color as string) ?? theme.textPrimary }]}
       >
@@ -91,6 +94,18 @@ function Static({ char, style }: { char: string; style?: TextStyle }) {
   );
 }
 
+/**
+ * A single character slot.
+ *
+ * The slot renders BOTH the outgoing and incoming glyph and translates them
+ * past each other, so it is never empty. The earlier version faded a single
+ * glyph out and back in, which left a hole in the number on every tick and
+ * made the whole thing read as blank rather than solid. An odometer wheel
+ * never shows a gap; neither should this.
+ *
+ * Direction follows value direction: rising numbers roll upward, so the new
+ * glyph enters from below and the old one leaves through the top.
+ */
 function Char({
   char,
   index,
@@ -109,50 +124,60 @@ function Char({
   reduced: boolean;
 }) {
   const { theme } = useTheme();
-  const offset = useSharedValue(0);
-  const opacity = useSharedValue(1);
-  // Flash is per-character, not per-number. Only the digits that actually
-  // changed carry colour — which is what makes a tick read as information
-  // rather than as decoration.
-  const flash = useSharedValue(0);
-  const flashSign = useSharedValue(0);
   const previousChar = useRef(char);
 
-  const fontSize = style?.fontSize ?? 15;
-  const lineHeight = fontSize * 1.25;
+  // `from` is the glyph leaving, `to` is the glyph arriving. When they match,
+  // the slot is at rest and only one glyph is rendered.
+  const [pair, setPair] = useState({ from: char, to: char });
+
+  // 0 = mid-roll start, 1 = settled. Starts settled.
+  const roll = useSharedValue(1);
+  const flash = useSharedValue(0);
+  const flashSign = useSharedValue(0);
+  // Captured for the worklet so a mid-roll direction change can't invert the
+  // glyphs that are already travelling.
+  const rollDir = useSharedValue(0);
+
+  const height = slotHeight(style);
 
   useEffect(() => {
-    const changed = previousChar.current !== char;
+    const from = previousChar.current;
+    if (from === char) return;
     previousChar.current = char;
 
-    if (!changed || direction === 0) return;
-
     // Separators never roll and never flash — only digits carry motion.
-    if (!/\d/.test(char)) return;
+    if (direction === 0 || !/\d/.test(char)) {
+      setPair({ from: char, to: char });
+      return;
+    }
 
-    const travel = reduced ? lineHeight * motion.reduced.travelScale : lineHeight;
-    const duration = variant === 'commit' ? 260 : 160;
+    setPair({ from, to: char });
+    rollDir.value = direction;
 
-    // Enter from the direction of travel: a rising value comes up from below.
-    offset.value = -direction * travel;
-    opacity.value = 0;
+    const duration = reduced
+      ? motion.digitRollMs[variant] * 0.5
+      : motion.digitRollMs[variant];
 
-    offset.value = withDelay(
+    roll.value = 0;
+    roll.value = withDelay(
       index * stagger,
-      withTiming(0, { duration, easing: Easing.out(Easing.cubic) }),
+      withTiming(1, { duration, easing: Easing.out(Easing.cubic) }),
     );
-    opacity.value = withDelay(index * stagger, withTiming(1, { duration: duration * 0.7 }));
 
     if (variant === 'tick') {
       flashSign.value = direction;
       const attack = reduced ? 0 : motion.tickAttackMs;
       const decay = reduced ? motion.reduced.tickDecayMs : motion.tickDecayMs;
       // Rise, then decay. The rise is short but non-zero — snapping straight
-      // to full colour is what reads as garish. Decays, never persists.
+      // to colour is what reads as a light switch. The peak stops short of
+      // full saturation on purpose.
       flash.value = withDelay(
         index * stagger,
         withSequence(
-          withTiming(1, { duration: attack, easing: Easing.out(Easing.quad) }),
+          withTiming(motion.tickFlashPeak, {
+            duration: attack,
+            easing: Easing.out(Easing.quad),
+          }),
           withTiming(0, { duration: decay, easing: Easing.out(Easing.quad) }),
         ),
       );
@@ -164,39 +189,64 @@ function Char({
     stagger,
     variant,
     reduced,
-    lineHeight,
-    offset,
-    opacity,
+    roll,
+    rollDir,
     flash,
     flashSign,
   ]);
 
   const baseColor = (style?.color as string) ?? theme.textPrimary;
 
-  const animatedStyle = useAnimatedStyle(() => {
-    const color =
+  const colorStyle = useAnimatedStyle(() => ({
+    color:
       variant === 'tick'
         ? interpolateColor(
             flash.value,
             [0, 1],
             [baseColor, flashSign.value >= 0 ? theme.flashUp : theme.flashDown],
           )
-        : baseColor;
+        : baseColor,
+  }));
 
-    return {
-      color,
-      opacity: opacity.value,
-      transform: [{ translateY: offset.value }],
-    };
-  });
+  // Arriving glyph: starts one slot away in the direction of travel, ends at 0.
+  const incomingStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: (1 - roll.value) * rollDir.value * height }],
+  }));
+
+  // Departing glyph: starts at 0, exits through the opposite edge.
+  const outgoingStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: -roll.value * rollDir.value * height }],
+  }));
+
+  const rolling = pair.from !== pair.to;
 
   return (
-    <View style={{ height: lineHeight, overflow: 'hidden', justifyContent: 'center' }}>
-      <Animated.Text style={[style, tabular, animatedStyle]}>{char}</Animated.Text>
+    <View style={{ height, overflow: 'hidden', justifyContent: 'center' }}>
+      {rolling ? (
+        <Animated.Text
+          style={[style, tabular, styles.outgoing, colorStyle, outgoingStyle]}
+        >
+          {pair.from}
+        </Animated.Text>
+      ) : null}
+      <Animated.Text style={[style, tabular, colorStyle, incomingStyle]}>
+        {pair.to}
+      </Animated.Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center' },
+  // Overlays the slot so the two glyphs occupy the same space. Safe because
+  // tabular numerals guarantee every digit has the same advance width.
+  outgoing: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    textAlign: 'center',
+    textAlignVertical: 'center',
+  },
 });

@@ -25,9 +25,9 @@ const springs = {
    * travel is much longer — the same spring that feels right settling 200px
    * feels sluggish covering 800px. Presentation should feel immediate;
    * settling should feel considered.
-   * critical at (340, 1) = 36.88
+   * critical at (460, 1) = 42.90
    */
-  sheetPresent: { damping: 38, stiffness: 340, mass: 1 },
+  sheetPresent: { damping: 44, stiffness: 460, mass: 1 },
 
   /** Hold-to-confirm snapping back on early release. critical at (320, 1) = 35.78 */
   confirmCancel: { damping: 38, stiffness: 320, mass: 1 },
@@ -71,6 +71,20 @@ export const motion = {
 
   /** Delay between adjacent digits in a roll. */
   digitStaggerMs: 25,
+
+  /**
+   * How long a digit takes to roll out of its slot and the next to roll in.
+   * The commit roll is deliberately slower — a balance moving should be
+   * legible as a single event, not a flicker.
+   */
+  digitRollMs: { tick: 190, commit: 300 },
+
+  /**
+   * Peak flash intensity, 0..1. Deliberately short of full saturation: a tick
+   * is ambient information, and information does not need to shout. Reaching
+   * the full flash colour is what made this read as garish.
+   */
+  tickFlashPeak: 0.72,
 
   /**
    * Price-tick flash attack. Not zero: snapping instantly to full colour is
