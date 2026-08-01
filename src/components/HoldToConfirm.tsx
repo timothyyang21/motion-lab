@@ -12,6 +12,7 @@ import Animated, {
   runOnJS,
   Easing,
   interpolate,
+  interpolateColor,
   Extrapolation,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -109,10 +110,15 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
           duration: reduced ? 0 : motion.commitBloomAttackMs,
           easing: Easing.out(Easing.quad),
         }),
-        withTiming(0, {
-          duration: motion.commitBloomDecayMs,
-          easing: Easing.out(Easing.cubic),
-        }),
+        // Hold at peak, then release. A flash with no hold is over before the
+        // eye has finished moving to it.
+        withDelay(
+          reduced ? 0 : motion.commitBloomHoldMs,
+          withTiming(0, {
+            duration: motion.commitBloomDecayMs,
+            easing: Easing.out(Easing.cubic),
+          }),
+        ),
       );
 
       runOnJS(commit)();
@@ -145,8 +151,26 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
     opacity: bloom.value,
   }));
 
+  /**
+   * The label on the filled side is tinted for the accent ground. At full
+   * bloom that ground is near-white, so the label has to invert with it or it
+   * disappears at exactly the moment the user is looking at it.
+   */
+  const filledLabelStyle = useAnimatedStyle(() => ({
+    color: interpolateColor(bloom.value, [0, 1], [theme.accentOn, theme.textPrimary]),
+  }));
+
   const containerStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: interpolate(morph.value, [0, 1], [1, 0.97], Extrapolation.CLAMP) }],
+    // The morph settles the button down to 0.97; the bloom pops it up as it
+    // fires. Together the button swells on commit and then sets, rather than
+    // simply shrinking — which read as the button retreating from the action.
+    transform: [
+      {
+        scale:
+          interpolate(morph.value, [0, 1], [1, 0.97], Extrapolation.CLAMP) +
+          bloom.value * motion.commitBloomScale,
+      },
+    ],
     borderRadius: interpolate(morph.value, [0, 1], [12, 26], Extrapolation.CLAMP),
   }));
 
@@ -182,9 +206,7 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
             for the accent ground so the text stays legible as the fill sweeps. */}
         <Animated.View style={[styles.clip, clipStyle]} pointerEvents="none">
           <View style={[styles.labelLayer, { width }]}>
-            <Animated.Text style={[typeScale.button, { color: theme.accentOn }]}>
-              {text}
-            </Animated.Text>
+            <Animated.Text style={[typeScale.button, filledLabelStyle]}>{text}</Animated.Text>
           </View>
         </Animated.View>
       </Animated.View>

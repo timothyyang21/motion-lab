@@ -34,12 +34,13 @@ export function AccountScreen() {
   const [balance, setBalance] = useState(BALANCE);
 
   const handleConfirm = () => {
-    // Let the morph land before the sheet leaves. Dismissing instantly reads
-    // as though the confirmation was skipped rather than acknowledged.
+    // Let the bloom finish before the sheet leaves. Dismissing mid-flash reads
+    // as though the confirmation was skipped rather than acknowledged — and it
+    // wastes the one moment the screen is allowed to be vivid.
     setTimeout(() => {
       setSelected(null);
       setBalance((current) => current - 2480.5);
-    }, 450);
+    }, 780);
   };
 
   return (

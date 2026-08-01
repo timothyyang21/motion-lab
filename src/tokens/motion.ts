@@ -85,8 +85,16 @@ export const motion = {
    * as slowly as it fades out reads as a glow, not a confirmation. The fall is
    * long enough to feel like a settle rather than a blink.
    */
-  commitBloomAttackMs: 80,
-  commitBloomDecayMs: 420,
+  commitBloomAttackMs: 70,
+  /**
+   * Sit at full bloom before releasing it. Without a hold the flash is over
+   * before the eye has finished moving to it — the same thing that made the
+   * price tick read as weak until it got one.
+   */
+  commitBloomHoldMs: 130,
+  commitBloomDecayMs: 620,
+  /** How much the button pops at commit, before settling into the morph. */
+  commitBloomScale: 0.04,
 
   /**
    * The haptic fires this many ms before the visual settles. Firing together
