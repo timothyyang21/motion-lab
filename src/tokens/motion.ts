@@ -59,8 +59,34 @@ export const motion = {
   /** Resistance applied when dragging past the topmost detent. */
   rubberBandFactor: 0.55,
 
-  /** Hold-to-confirm build. Linear — an eased fill lies about progress. */
+  /** Hold-to-confirm build. */
   confirmBuildMs: 700,
+
+  /**
+   * Cubic-bezier control points for the fill — easeInCubic.
+   *
+   * Deliberately NOT linear. A linear fill is the honest choice about time
+   * remaining, and it's the obvious one; an accelerating fill instead makes
+   * commitment feel like it gathers. The hard part is the beginning, and once
+   * you're past it the thing pulls toward completion.
+   *
+   * The trade-off is real and worth stating: at half the elapsed time the fill
+   * is only ~12% across, so it under-reports progress. That's acceptable here
+   * because this control isn't reporting a download — it's asking whether you
+   * mean it.
+   *
+   * Kept as plain numbers rather than an Easing object so this file stays
+   * dependency-free and unit-testable.
+   */
+  confirmFillBezier: [0.55, 0.055, 0.675, 0.19],
+
+  /**
+   * The bloom on commit. Rises faster than it falls — a flash that fades in
+   * as slowly as it fades out reads as a glow, not a confirmation. The fall is
+   * long enough to feel like a settle rather than a blink.
+   */
+  commitBloomAttackMs: 80,
+  commitBloomDecayMs: 420,
 
   /**
    * The haptic fires this many ms before the visual settles. Firing together

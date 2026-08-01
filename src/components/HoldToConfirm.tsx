@@ -7,6 +7,7 @@ import Animated, {
   withTiming,
   withSpring,
   withDelay,
+  withSequence,
   cancelAnimation,
   runOnJS,
   Easing,
@@ -46,6 +47,7 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
 
   const progress = useSharedValue(0);
   const morph = useSharedValue(0);
+  const bloom = useSharedValue(0);
   // A dedicated vehicle for the lead haptic. Piggybacking the timer on `morph`
   // works but collides with the commit animation and is a trap for whoever
   // tunes this next.
@@ -72,11 +74,13 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
     // travel would read as the button being broken, not as a deliberate abort.
     .maxDistance(10000)
     .onBegin(() => {
-      // Linear. An eased fill lies about progress — it implies the wait is
-      // shorter or longer than it actually is, and the hand can feel the lie.
+      // Accelerating, not linear. Commitment should feel like it gathers:
+      // slow to start, then pulling toward completion. See the note on
+      // confirmFillBezier in motion.ts for the trade-off this accepts.
+      const [x1, y1, x2, y2] = motion.confirmFillBezier;
       progress.value = withTiming(1, {
         duration: buildMs,
-        easing: Easing.linear,
+        easing: Easing.bezier(x1, y1, x2, y2),
       });
 
       // The haptic leads the visual by a beat. Firing together reads as
@@ -95,6 +99,22 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
       // this thing changed — which is the truthful reading, and the one
       // Farebound needs when a transaction commits.
       morph.value = withSpring(1, cancelSpring);
+
+      // A bloom across the filled button at the moment of commit. Rises fast,
+      // settles slow. This is the visual half of the same beat the haptic
+      // lands on, and it's what makes the commit feel finished rather than
+      // merely over.
+      bloom.value = withSequence(
+        withTiming(1, {
+          duration: reduced ? 0 : motion.commitBloomAttackMs,
+          easing: Easing.out(Easing.quad),
+        }),
+        withTiming(0, {
+          duration: motion.commitBloomDecayMs,
+          easing: Easing.out(Easing.cubic),
+        }),
+      );
+
       runOnJS(commit)();
     })
     .onFinalize((_event, success) => {
@@ -121,6 +141,10 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
     width: progress.value * width,
   }));
 
+  const bloomStyle = useAnimatedStyle(() => ({
+    opacity: bloom.value,
+  }));
+
   const containerStyle = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(morph.value, [0, 1], [1, 0.97], Extrapolation.CLAMP) }],
     borderRadius: interpolate(morph.value, [0, 1], [12, 26], Extrapolation.CLAMP),
@@ -139,6 +163,13 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
         ]}
       >
         <Animated.View style={[styles.fill, { backgroundColor: theme.accent }, fillStyle]} />
+
+        {/* Commit bloom. Sits above the fill and below the labels so the text
+            brightens with the ground rather than being washed out by it. */}
+        <Animated.View
+          pointerEvents="none"
+          style={[styles.bloom, { backgroundColor: theme.sheen }, bloomStyle]}
+        />
 
         {/* Base label — the unfilled side. */}
         <View style={styles.labelLayer} pointerEvents="none">
@@ -170,6 +201,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fill: { position: 'absolute', left: 0, top: 0, bottom: 0 },
+  bloom: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
   labelLayer: {
     position: 'absolute',
     left: 0,

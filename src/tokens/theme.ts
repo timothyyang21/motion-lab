@@ -23,6 +23,12 @@ export type Theme = {
   accentOn: string;
   scrim: string;
   shadow: string;
+  /**
+   * A white bloom laid over the accent on commit. Achromatic on purpose —
+   * it brightens whatever it covers rather than introducing a second hue, so
+   * the scarce-colour rule holds and one value works on both grounds.
+   */
+  sheen: string;
   flashUp: string;
   flashDown: string;
 };
@@ -41,6 +47,7 @@ export const lightTheme: Theme = {
   // Not black-at-opacity: black over white goes grey and reads cheap.
   scrim: 'rgba(14, 18, 21, 0.28)',
   shadow: '#0E1215',
+  sheen: 'rgba(255, 255, 255, 0.42)',
   flashUp: '#0F7A4A',
   flashDown: '#B3261E',
 };
@@ -57,6 +64,9 @@ export const darkTheme: Theme = {
   accentOn: '#06222A',
   scrim: 'rgba(0, 0, 0, 0.55)',
   shadow: '#000000',
+  // Lower alpha on dark: the accent is already luminous there, so the same
+  // strength would blow it to flat white.
+  sheen: 'rgba(255, 255, 255, 0.30)',
   flashUp: '#4ADE80',
   flashDown: '#F87171',
 };
