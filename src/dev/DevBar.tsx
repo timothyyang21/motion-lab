@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../tokens/ThemeProvider';
 import { typeScale } from '../tokens/theme';
@@ -22,6 +22,19 @@ type Props = {
  */
 export function DevBar({ naive, onToggleNaive, reduced, onToggleReduced }: Props) {
   const { theme, scheme, setOverride } = useTheme();
+  const [open, setOpen] = useState(true);
+
+  // Collapsed, it becomes a nearly invisible dot rather than disappearing —
+  // at GIF scale it reads as nothing, but it can't be lost mid-shoot either.
+  if (!open) {
+    return (
+      <Pressable
+        onPress={() => setOpen(true)}
+        hitSlop={20}
+        style={[styles.dot, { backgroundColor: theme.textTertiary }]}
+      />
+    );
+  }
 
   return (
     <View style={[styles.bar, { borderColor: theme.hairline, backgroundColor: theme.surface }]}>
@@ -32,6 +45,7 @@ export function DevBar({ naive, onToggleNaive, reduced, onToggleReduced }: Props
         onPress={() => setOverride(scheme === 'dark' ? 'light' : 'dark')}
       />
       <Chip active={reduced} label="REDUCED" onPress={onToggleReduced} />
+      <Chip active={false} label="HIDE" onPress={() => setOpen(false)} />
     </View>
   );
 }
@@ -76,6 +90,15 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
+  },
+  dot: {
+    position: 'absolute',
+    top: 70,
+    right: 22,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    opacity: 0.25,
   },
   chip: {
     paddingHorizontal: 9,

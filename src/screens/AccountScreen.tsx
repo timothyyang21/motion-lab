@@ -15,18 +15,40 @@ const DETAIL_ROWS = [
   { label: 'MARKET CAP', value: '1.27T' },
   { label: '24H VOLUME', value: '38.4B' },
   { label: 'CIRCULATING', value: '19.87M' },
+  { label: 'MAX SUPPLY', value: '21.00M' },
   { label: 'ALL-TIME HIGH', value: '73,750.07' },
   { label: 'ALL-TIME LOW', value: '67.81' },
+  { label: '24H HIGH', value: '64,902.11' },
+  { label: '24H LOW', value: '63,140.85' },
   { label: '7D CHANGE', value: '+4.12%' },
   { label: '30D CHANGE', value: '-2.86%' },
+  { label: '90D CHANGE', value: '+18.03%' },
   { label: '1Y CHANGE', value: '+61.40%' },
+  { label: 'VOLATILITY 30D', value: '2.94%' },
   { label: 'AVG COST', value: '41,208.33' },
+  { label: 'BOOK VALUE', value: '16,977.83' },
   { label: 'UNREALISED', value: '+9,472.18' },
   { label: 'REALISED', value: '+1,204.00' },
   { label: 'FEES PAID', value: '318.44' },
   { label: 'FIRST BOUGHT', value: '2021-11-08' },
   { label: 'LAST TRADE', value: '2026-07-14' },
   { label: 'ORDERS', value: '47' },
+  { label: 'OPEN ORDERS', value: '2' },
+];
+
+const ACTIVITY_ROWS = [
+  { date: '2026-07-14', kind: 'Buy', amount: '+0.0240' },
+  { date: '2026-07-02', kind: 'Sell', amount: '-0.0115' },
+  { date: '2026-06-28', kind: 'Buy', amount: '+0.0500' },
+  { date: '2026-06-19', kind: 'Buy', amount: '+0.0075' },
+  { date: '2026-06-04', kind: 'Sell', amount: '-0.0330' },
+  { date: '2026-05-22', kind: 'Buy', amount: '+0.0410' },
+  { date: '2026-05-09', kind: 'Buy', amount: '+0.0180' },
+  { date: '2026-04-27', kind: 'Sell', amount: '-0.0092' },
+  { date: '2026-04-11', kind: 'Buy', amount: '+0.0625' },
+  { date: '2026-03-30', kind: 'Buy', amount: '+0.0208' },
+  { date: '2026-03-15', kind: 'Sell', amount: '-0.0471' },
+  { date: '2026-02-26', kind: 'Buy', amount: '+0.0350' },
 ];
 
 export function AccountScreen() {
@@ -108,6 +130,9 @@ export function AccountScreen() {
           {/* Exists so the sheet has something to scroll — the handoff needs
               content taller than the sheet to be demonstrable at all. */}
           <View style={styles.detail}>
+            <Text style={[typeScale.caption, { color: theme.textTertiary }, styles.section]}>
+              STATISTICS
+            </Text>
             {DETAIL_ROWS.map((row) => (
               <View key={row.label} style={styles.detailRow}>
                 <View style={[styles.hairline, { backgroundColor: theme.hairline }]} />
@@ -119,6 +144,32 @@ export function AccountScreen() {
                     style={[typeScale.rowValue, { color: theme.textSecondary }, tabular]}
                   >
                     {row.value}
+                  </Text>
+                </View>
+              </View>
+            ))}
+
+            <Text style={[typeScale.caption, { color: theme.textTertiary }, styles.section]}>
+              ACTIVITY
+            </Text>
+            {ACTIVITY_ROWS.map((row) => (
+              <View key={row.date} style={styles.detailRow}>
+                <View style={[styles.hairline, { backgroundColor: theme.hairline }]} />
+                <View style={styles.detailInner}>
+                  <View>
+                    <Text style={[typeScale.rowLabel, { color: theme.textPrimary }]}>
+                      {row.kind}
+                    </Text>
+                    <Text
+                      style={[typeScale.caption, { color: theme.textTertiary }, tabular]}
+                    >
+                      {row.date}
+                    </Text>
+                  </View>
+                  <Text
+                    style={[typeScale.rowValue, { color: theme.textSecondary }, tabular]}
+                  >
+                    {row.amount} {selected?.symbol ?? ''}
                   </Text>
                 </View>
               </View>
@@ -195,6 +246,7 @@ const styles = StyleSheet.create({
   sheetContent: { paddingHorizontal: 20, paddingTop: 16 },
   confirmWrap: { marginTop: 28 },
   detail: { marginTop: 36 },
+  section: { marginTop: 28, marginBottom: 4 },
   detailRow: { position: 'relative' },
   detailInner: {
     flexDirection: 'row',
