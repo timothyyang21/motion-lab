@@ -151,18 +151,22 @@ function Char({
       return;
     }
 
-    setPair({ from, to: char });
-    rollDir.value = direction;
+    if (reduced && !motion.reduced.rollDigits) {
+      // Swap in place. The flash below still says what changed and which way.
+      setPair({ from: char, to: char });
+    } else {
+      setPair({ from, to: char });
+      rollDir.value = direction;
 
-    const duration = reduced
-      ? motion.digitRollMs[variant] * 0.5
-      : motion.digitRollMs[variant];
-
-    roll.value = 0;
-    roll.value = withDelay(
-      index * stagger,
-      withTiming(1, { duration, easing: Easing.out(Easing.cubic) }),
-    );
+      roll.value = 0;
+      roll.value = withDelay(
+        index * stagger,
+        withTiming(1, {
+          duration: motion.digitRollMs[variant],
+          easing: Easing.out(Easing.cubic),
+        }),
+      );
+    }
 
     if (variant === 'tick') {
       flashSign.value = direction;

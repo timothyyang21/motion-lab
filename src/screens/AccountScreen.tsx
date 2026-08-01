@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useTheme } from '../tokens/ThemeProvider';
+import { DevBar } from '../dev/DevBar';
 import { typeScale, tabular } from '../tokens/theme';
 import { RollingNumber } from '../components/RollingNumber';
 import { Sheet } from '../components/Sheet';
@@ -32,6 +34,13 @@ export function AccountScreen() {
   const instruments = useTickingPrices();
   const [selected, setSelected] = useState<Instrument | null>(null);
   const [balance, setBalance] = useState(BALANCE);
+  const [naive, setNaive] = useState(false);
+
+  // The system setting is the source of truth; the toggle overrides it so the
+  // behaviour is capturable without digging through Accessibility settings.
+  const systemReduced = useReducedMotion();
+  const [reducedOverride, setReducedOverride] = useState<boolean | null>(null);
+  const reduced = reducedOverride ?? systemReduced;
 
   const handleConfirm = () => {
     // Let the bloom finish before the sheet leaves. Dismissing mid-flash reads
@@ -54,6 +63,7 @@ export function AccountScreen() {
           decimals={2}
           variant="commit"
           prefix="$"
+          reduced={reduced}
           style={{ ...typeScale.balance, color: theme.textPrimary }}
         />
 
@@ -62,11 +72,21 @@ export function AccountScreen() {
         </View>
 
         {instruments.map((instrument) => (
-          <Row key={instrument.id} instrument={instrument} onPress={() => setSelected(instrument)} />
+          <Row
+            key={instrument.id}
+            instrument={instrument}
+            reduced={reduced}
+            onPress={() => setSelected(instrument)}
+          />
         ))}
       </ScrollView>
 
-      <Sheet visible={!!selected} onClose={() => setSelected(null)}>
+      <Sheet
+        visible={!!selected}
+        onClose={() => setSelected(null)}
+        naive={naive}
+        reduced={reduced}
+      >
         <View style={styles.sheetContent}>
           <Text style={[typeScale.sheetTitle, { color: theme.textPrimary }]}>
             {selected?.name ?? ''}
@@ -81,6 +101,7 @@ export function AccountScreen() {
               label="Hold to sell"
               confirmedLabel="Sold"
               onConfirm={handleConfirm}
+              reduced={reduced}
             />
           </View>
 
@@ -105,11 +126,28 @@ export function AccountScreen() {
           </View>
         </View>
       </Sheet>
+
+      {/* Rendered after the sheet so it stays on top: a comparison GIF with the
+          mode chip visible is evidence, one without it is a claim. */}
+      <DevBar
+        naive={naive}
+        onToggleNaive={() => setNaive((v) => !v)}
+        reduced={reduced}
+        onToggleReduced={() => setReducedOverride(!reduced)}
+      />
     </View>
   );
 }
 
-function Row({ instrument, onPress }: { instrument: Instrument; onPress: () => void }) {
+function Row({
+  instrument,
+  onPress,
+  reduced,
+}: {
+  instrument: Instrument;
+  onPress: () => void;
+  reduced: boolean;
+}) {
   const { theme } = useTheme();
 
   return (
@@ -132,6 +170,7 @@ function Row({ instrument, onPress }: { instrument: Instrument; onPress: () => v
           decimals={instrument.price < 10 ? 4 : 2}
           variant="tick"
           prefix="$"
+          reduced={reduced}
           style={{ ...typeScale.rowValue, color: theme.textPrimary }}
         />
       </View>
@@ -141,7 +180,8 @@ function Row({ instrument, onPress }: { instrument: Instrument; onPress: () => v
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { paddingTop: 72, paddingHorizontal: 20, paddingBottom: 48 },
+  // Clears the dev bar, which floats at the top right.
+  content: { paddingTop: 118, paddingHorizontal: 20, paddingBottom: 48 },
   label: { marginBottom: 6 },
   listHeader: { marginTop: 44, marginBottom: 4 },
   row: { position: 'relative' },

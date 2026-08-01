@@ -154,8 +154,13 @@ export const motion = {
       confirmCancel: { damping: 44, stiffness: 400, mass: 1 },
       commitSettle: { damping: 40, stiffness: 200, mass: 1 },
     } satisfies Record<string, SpringConfig>,
-    /** Fraction of normal travel distance for entrance transforms. */
-    travelScale: 0.25,
+    /**
+     * Digits swap in place rather than rolling. A column of tumbling numerals
+     * is precisely the motion this setting exists to suppress — and the flash
+     * still carries the same information (something changed, and which way),
+     * so nothing is lost but the tumbling.
+     */
+    rollDigits: false,
     digitStaggerMs: 0,
     tickDecayMs: 300,
   },
