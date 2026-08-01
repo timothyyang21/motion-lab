@@ -171,6 +171,7 @@ function Char({
       // Rise, then decay. The rise is short but non-zero — snapping straight
       // to colour is what reads as a light switch. The peak stops short of
       // full saturation on purpose.
+      const hold = reduced ? 0 : motion.tickHoldMs;
       flash.value = withDelay(
         index * stagger,
         withSequence(
@@ -178,7 +179,8 @@ function Char({
             duration: attack,
             easing: Easing.out(Easing.quad),
           }),
-          withTiming(0, { duration: decay, easing: Easing.out(Easing.quad) }),
+          // Sit at peak, then decay. Still decays — never persists.
+          withDelay(hold, withTiming(0, { duration: decay, easing: Easing.out(Easing.quad) })),
         ),
       );
     }

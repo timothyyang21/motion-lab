@@ -93,8 +93,16 @@ export const motion = {
    */
   tickAttackMs: 90,
 
+  /**
+   * How long the flash sits at full peak before it starts decaying. A slower
+   * decay alone doesn't read as "staying" — it reads as a long dissolve,
+   * because it starts leaving the moment it arrives. The hold is what makes
+   * the colour feel like it landed.
+   */
+  tickHoldMs: 200,
+
   /** Price-tick flash decay. Decays — never persists. */
-  tickDecayMs: 600,
+  tickDecayMs: 900,
 
   /**
    * Reduced motion is a second set of values, not a kill switch. Things still

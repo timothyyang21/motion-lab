@@ -4,6 +4,7 @@ import { useTheme } from '../tokens/ThemeProvider';
 import { typeScale, tabular } from '../tokens/theme';
 import { RollingNumber } from '../components/RollingNumber';
 import { Sheet } from '../components/Sheet';
+import { HoldToConfirm } from '../components/HoldToConfirm';
 import { useTickingPrices, type Instrument } from '../data/instruments';
 
 const BALANCE = 128420.55;
@@ -12,6 +13,16 @@ export function AccountScreen() {
   const { theme } = useTheme();
   const instruments = useTickingPrices();
   const [selected, setSelected] = useState<Instrument | null>(null);
+  const [balance, setBalance] = useState(BALANCE);
+
+  const handleConfirm = () => {
+    // Let the morph land before the sheet leaves. Dismissing instantly reads
+    // as though the confirmation was skipped rather than acknowledged.
+    setTimeout(() => {
+      setSelected(null);
+      setBalance((current) => current - 2480.5);
+    }, 450);
+  };
 
   return (
     <View style={[styles.root, { backgroundColor: theme.ground }]}>
@@ -20,7 +31,7 @@ export function AccountScreen() {
           TOTAL BALANCE
         </Text>
         <RollingNumber
-          value={BALANCE}
+          value={balance}
           decimals={2}
           variant="commit"
           prefix="$"
@@ -44,6 +55,15 @@ export function AccountScreen() {
           <Text style={[typeScale.caption, { color: theme.textTertiary }, styles.label]}>
             {selected?.symbol ?? ''}
           </Text>
+
+          <View style={styles.confirmWrap}>
+            <HoldToConfirm
+              key={selected?.id ?? 'none'}
+              label="Hold to sell"
+              confirmedLabel="Sold"
+              onConfirm={handleConfirm}
+            />
+          </View>
         </View>
       </Sheet>
     </View>
@@ -94,4 +114,5 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   sheetContent: { paddingHorizontal: 20, paddingTop: 16 },
+  confirmWrap: { marginTop: 28 },
 });
