@@ -85,16 +85,20 @@ export const motion = {
    * as slowly as it fades out reads as a glow, not a confirmation. The fall is
    * long enough to feel like a settle rather than a blink.
    */
-  commitBloomAttackMs: 70,
   /**
-   * Sit at full bloom before releasing it. Without a hold the flash is over
-   * before the eye has finished moving to it — the same thing that made the
-   * price tick read as weak until it got one.
+   * The shimmer that crosses the button on commit. A band of light sweeping
+   * left to right, once, quickly — a moving highlight rather than a flash.
+   * Fast enough to read as a glint; slow enough to see which way it went.
    */
-  commitBloomHoldMs: 130,
-  commitBloomDecayMs: 620,
-  /** How much the button pops at commit, before settling into the morph. */
-  commitBloomScale: 0.04,
+  shimmerDurationMs: 520,
+  /** Band width as a fraction of the button. Wider reads as a wash, not a glint. */
+  shimmerBandFraction: 0.42,
+  /**
+   * The band is built from this many vertical slices with opacity on a bell
+   * curve, because a hard-edged band reads cheap and a real gradient would
+   * mean a fourth runtime dependency. At sweep speed the steps disappear.
+   */
+  shimmerSlices: 14,
 
   /**
    * The haptic fires this many ms before the visual settles. Firing together

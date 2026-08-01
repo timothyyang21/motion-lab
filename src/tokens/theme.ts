@@ -47,7 +47,7 @@ export const lightTheme: Theme = {
   // Not black-at-opacity: black over white goes grey and reads cheap.
   scrim: 'rgba(14, 18, 21, 0.28)',
   shadow: '#0E1215',
-  sheen: 'rgba(255, 255, 255, 0.88)',
+  sheen: 'rgba(255, 255, 255, 0.60)',
   flashUp: '#0F7A4A',
   flashDown: '#B3261E',
 };
@@ -66,7 +66,7 @@ export const darkTheme: Theme = {
   shadow: '#000000',
   // Lower alpha on dark: the accent is already luminous there, so the same
   // strength would blow it to flat white.
-  sheen: 'rgba(255, 255, 255, 0.72)',
+  sheen: 'rgba(255, 255, 255, 0.45)',
   flashUp: '#4ADE80',
   flashDown: '#F87171',
 };

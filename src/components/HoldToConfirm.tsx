@@ -7,12 +7,10 @@ import Animated, {
   withTiming,
   withSpring,
   withDelay,
-  withSequence,
   cancelAnimation,
   runOnJS,
   Easing,
   interpolate,
-  interpolateColor,
   Extrapolation,
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
@@ -21,6 +19,19 @@ import { useTheme } from '../tokens/ThemeProvider';
 import { typeScale } from '../tokens/theme';
 
 const HEIGHT = 56;
+
+/**
+ * The shimmer band, precomputed once.
+ *
+ * Opacity follows a half-sine across the band, so it fades in at the leading
+ * edge, peaks in the middle, and fades out behind — the shape a real highlight
+ * has. A uniform band would read as a white rectangle sliding past, which is
+ * the difference between a shimmer and a loading bar.
+ */
+const SLICES = Array.from({ length: motion.shimmerSlices }, (_, i) => ({
+  key: `s${i}`,
+  opacity: Math.sin((Math.PI * (i + 0.5)) / motion.shimmerSlices),
+}));
 
 type Props = {
   label: string;
@@ -48,7 +59,7 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
 
   const progress = useSharedValue(0);
   const morph = useSharedValue(0);
-  const bloom = useSharedValue(0);
+  const shimmer = useSharedValue(0);
   // A dedicated vehicle for the lead haptic. Piggybacking the timer on `morph`
   // works but collides with the commit animation and is a trap for whoever
   // tunes this next.
@@ -105,21 +116,15 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
       // settles slow. This is the visual half of the same beat the haptic
       // lands on, and it's what makes the commit feel finished rather than
       // merely over.
-      bloom.value = withSequence(
-        withTiming(1, {
-          duration: reduced ? 0 : motion.commitBloomAttackMs,
-          easing: Easing.out(Easing.quad),
-        }),
-        // Hold at peak, then release. A flash with no hold is over before the
-        // eye has finished moving to it.
-        withDelay(
-          reduced ? 0 : motion.commitBloomHoldMs,
-          withTiming(0, {
-            duration: motion.commitBloomDecayMs,
-            easing: Easing.out(Easing.cubic),
-          }),
-        ),
-      );
+      // The shimmer. One pass, left to right, and then it's gone — a highlight
+      // crossing the surface rather than the surface changing colour.
+      shimmer.value = 0;
+      shimmer.value = withTiming(1, {
+        duration: reduced ? 0 : motion.shimmerDurationMs,
+        // Slightly eased out so it decelerates as it leaves, which reads as
+        // light travelling across a surface rather than a bar being dragged.
+        easing: Easing.out(Easing.quad),
+      });
 
       runOnJS(commit)();
     })
@@ -147,30 +152,26 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
     width: progress.value * width,
   }));
 
-  const bloomStyle = useAnimatedStyle(() => ({
-    opacity: bloom.value,
-  }));
+  const bandWidth = width * motion.shimmerBandFraction;
 
-  /**
-   * The label on the filled side is tinted for the accent ground. At full
-   * bloom that ground is near-white, so the label has to invert with it or it
-   * disappears at exactly the moment the user is looking at it.
-   */
-  const filledLabelStyle = useAnimatedStyle(() => ({
-    color: interpolateColor(bloom.value, [0, 1], [theme.accentOn, theme.textPrimary]),
+  // Travels from fully off the left edge to fully off the right, so the button
+  // is clean at both ends of the sweep.
+  const shimmerStyle = useAnimatedStyle(() => ({
+    opacity: width > 0 ? 1 : 0,
+    transform: [
+      {
+        translateX: interpolate(
+          shimmer.value,
+          [0, 1],
+          [-bandWidth, width],
+          Extrapolation.CLAMP,
+        ),
+      },
+    ],
   }));
 
   const containerStyle = useAnimatedStyle(() => ({
-    // The morph settles the button down to 0.97; the bloom pops it up as it
-    // fires. Together the button swells on commit and then sets, rather than
-    // simply shrinking — which read as the button retreating from the action.
-    transform: [
-      {
-        scale:
-          interpolate(morph.value, [0, 1], [1, 0.97], Extrapolation.CLAMP) +
-          bloom.value * motion.commitBloomScale,
-      },
-    ],
+    transform: [{ scale: interpolate(morph.value, [0, 1], [1, 0.97], Extrapolation.CLAMP) }],
     borderRadius: interpolate(morph.value, [0, 1], [12, 26], Extrapolation.CLAMP),
   }));
 
@@ -188,12 +189,23 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
       >
         <Animated.View style={[styles.fill, { backgroundColor: theme.accent }, fillStyle]} />
 
-        {/* Commit bloom. Sits above the fill and below the labels so the text
-            brightens with the ground rather than being washed out by it. */}
+        {/* Commit shimmer. Sits above the fill and below the labels, so the
+            highlight passes beneath the text rather than washing it out. */}
         <Animated.View
           pointerEvents="none"
-          style={[styles.bloom, { backgroundColor: theme.sheen }, bloomStyle]}
-        />
+          style={[styles.shimmer, { width: bandWidth }, shimmerStyle]}
+        >
+          {SLICES.map((slice) => (
+            <View
+              key={slice.key}
+              style={{
+                flex: 1,
+                backgroundColor: theme.sheen,
+                opacity: slice.opacity,
+              }}
+            />
+          ))}
+        </Animated.View>
 
         {/* Base label — the unfilled side. */}
         <View style={styles.labelLayer} pointerEvents="none">
@@ -206,7 +218,9 @@ export function HoldToConfirm({ label, confirmedLabel, onConfirm, reduced = fals
             for the accent ground so the text stays legible as the fill sweeps. */}
         <Animated.View style={[styles.clip, clipStyle]} pointerEvents="none">
           <View style={[styles.labelLayer, { width }]}>
-            <Animated.Text style={[typeScale.button, filledLabelStyle]}>{text}</Animated.Text>
+            <Animated.Text style={[typeScale.button, { color: theme.accentOn }]}>
+              {text}
+            </Animated.Text>
           </View>
         </Animated.View>
       </Animated.View>
@@ -223,7 +237,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   fill: { position: 'absolute', left: 0, top: 0, bottom: 0 },
-  bloom: { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 },
+  shimmer: { position: 'absolute', left: 0, top: 0, bottom: 0, flexDirection: 'row' },
   labelLayer: {
     position: 'absolute',
     left: 0,
