@@ -91,7 +91,15 @@ there's no question of it being two different apps.
 
 ## Scroll-to-pan handoff
 
-<!-- GIF: handoff.gif — scroll the content, reach the top, keep pulling. -->
+<p align="center">
+  <img src="docs/handoff.gif" width="420" alt="Content scrolling inside a bottom sheet, then the sheet itself taking over the same drag once the list reaches its top">
+</p>
+
+*The list moves while the sheet's top edge stays welded in place. Then the list
+runs out, the finger keeps pulling, and the sheet picks up the same gesture
+without a break in it — one drag changing owner, not a handover between two
+modes. Filmed slowly on purpose, because the subject is a frame that isn't
+there.*
 
 At the tallest detent the content owns vertical motion; the sheet takes over
 only when the content has nothing left to give. Four things keep the seam
