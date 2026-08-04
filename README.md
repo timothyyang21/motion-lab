@@ -39,10 +39,19 @@ and the deceleration identity is expressed in points per *millisecond*. Without
 it an ordinary 800 px/s flick projects to roughly 400,000px and projection
 quietly degenerates into a very expensive threshold.
 
-**Interruptible.** Grab it mid-flight and it picks up from its current position
-carrying its current velocity. The failure most implementations ship is
-re-seeding position but dropping velocity — the sheet stops dead under your
-finger, then lurches.
+**Interruptible.** Grab it mid-flight and it picks up from exactly where it is.
+The running animation is cancelled and the gesture re-seeded from the *live*
+position, so the sheet is under your thumb from the first frame rather than
+snapping back to wherever the flick began. On release, the gesture's velocity is
+handed to the spring, so the settle continues your hand's motion instead of
+starting again from rest.
+
+The failure most implementations ship is re-seeding the position but dropping
+that velocity — the sheet stops dead under your finger, then lurches.
+
+Checked on hardware on a Release build, not inferred from the code: caught
+mid-flight it stays glued to the thumb with no jump, and held still it stops
+where it was caught.
 
 **No overshoot, anywhere.** Every spring is at or above critical damping
 (`2√(stiffness × mass)`), and [a test](__tests__/damping.test.ts) iterates every
@@ -63,7 +72,10 @@ to show.
 ## Naive vs. tuned
 
 <!-- GIF: naive-vs-tuned.gif — side by side, same flick strength both sides.
-     Keep the mode chip in frame; it's the evidence this is one build. -->
+     Both runs must start from the MIDDLE detent, where the two algorithms
+     actually disagree. Keep the MODE row in frame and tap it on camera; it's
+     the evidence this is one build. The dev panel opens from the faint dot at
+     the top right. -->
 
 Same build, same device, same hand — [toggled at runtime](src/dev/DevBar.tsx) so
 there's no question of it being two different apps.
@@ -75,7 +87,7 @@ there's no question of it being two different apps.
 <!-- GIF: handoff.gif — scroll the content, reach the top, keep pulling. -->
 
 At the tallest detent the content owns vertical motion; the sheet takes over
-only when the content has nothing left to give. Three things keep the seam
+only when the content has nothing left to give. Four things keep the seam
 invisible:
 
 - The gesture origin is **re-based against live translation** while the content
@@ -85,6 +97,14 @@ invisible:
   is what produces the stutter that makes most implementations feel seamed.
 - `bounces={false}` is required, not stylistic — iOS bounce drives
   `contentOffset.y` negative, so the handoff fires early and often twice.
+- The content is **inert unless the sheet is parked at the top**, and it's
+  pinned on every frame the sheet moves rather than only on gesture frames. An
+  earlier version pinned it inside the pan handler alone, so the rule held while
+  a finger was down and lapsed the instant one lifted — a list with momentum
+  kept coasting behind a sheet that was itself in flight. Two things moving at
+  once, and no way for the eye to tell which one it should be following.
+
+Verified on device: no stutter frame at the changeover.
 
 ---
 
@@ -208,8 +228,33 @@ The pure logic is unit-tested: velocity projection, detent snapping, rubber
 banding, digit formatting, theme parity, and the critical-damping guard.
 
 Gesture feel, spring character, and haptic timing are **not** tested, because
-they can't be. Snapshot-testing them would be theatre. They were tuned by hand
+they can't be. Snapshot-testing them would be theatre. They're decided by hand
 on a device, which is the only way that judgment gets made.
+
+That doesn't mean they're decided by vibe. Constants are chosen by comparison
+rather than by assertion: candidates get cycled at runtime on a Release build
+and judged back to back, unlabelled, against a control. Nobody can answer *"does
+460 feel right?"* — everybody can answer *"is 1 or 3 better?"*
+
+One result from doing that is worth stating, because it changed the method. For
+a critically damped spring, travel time runs with `1/√stiffness`, so equal steps
+in stiffness are **not** equal steps in perception:
+
+```
+460 → ~186ms     800 → ~140ms     950 → ~130ms     1100 → ~120ms
+```
+
+950 and 1100 look far apart as numbers and are about one frame apart at 60Hz —
+genuinely indistinguishable when tested blind. Candidates have to be spaced by
+target *duration*, not by round numbers, or a tuning round returns nothing and
+reads as "they all feel the same."
+
+The stopping rule that falls out of it: raise the value until further increases
+can't be told apart, then take the **lowest** value that can't be told apart from
+the fastest. Past that point the extra stiffness buys nothing visible and only
+risks reading as abrupt on slower hardware. That's how the sheet's entrance
+landed on 800, and the derivation sits next to the constant in
+[`motion.ts`](src/tokens/motion.ts).
 
 ## Licence
 
