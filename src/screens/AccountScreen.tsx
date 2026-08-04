@@ -178,8 +178,9 @@ export function AccountScreen() {
         </View>
       </Sheet>
 
-      {/* Rendered after the sheet so it stays on top: a comparison GIF with the
-          mode chip visible is evidence, one without it is a claim. */}
+      {/* Rendered after the sheet so it stays on top when opened: a comparison
+          GIF with the mode visible is evidence, one without it is a claim.
+          Closed — which is how it starts — it is a single faint dot. */}
       <DevBar
         naive={naive}
         onToggleNaive={() => setNaive((v) => !v)}
@@ -231,8 +232,10 @@ function Row({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  // Clears the dev bar, which floats at the top right.
-  content: { paddingTop: 118, paddingHorizontal: 20, paddingBottom: 48 },
+  // Clears the status bar. It used to be 118 to clear the dev bar as well,
+  // which meant a debug control was setting the layout of the screen it exists
+  // to inspect. The dev panel is an overlay now and costs this nothing.
+  content: { paddingTop: 72, paddingHorizontal: 20, paddingBottom: 48 },
   label: { marginBottom: 6 },
   listHeader: { marginTop: 44, marginBottom: 4 },
   row: { position: 'relative' },
