@@ -25,9 +25,27 @@ const springs = {
    * travel is much longer — the same spring that feels right settling 200px
    * feels sluggish covering 800px. Presentation should feel immediate;
    * settling should feel considered.
-   * critical at (460, 1) = 42.90
+   *
+   * 800 was chosen on device, on a Release build, by comparison rather than by
+   * argument. The history is 200 → 340 → 460 → 800, always in the same
+   * direction: every time this was judged against a faster alternative, the
+   * faster one won.
+   *
+   * It stops at 800 because that is where the curve goes flat. A critically
+   * damped spring's travel time runs with 1/sqrt(stiffness), so equal steps in
+   * stiffness are NOT equal steps in perceived speed:
+   *
+   *   460 -> ~186ms     800 -> ~140ms     950 -> ~130ms     1100 -> ~120ms
+   *
+   * 460 to 800 is 46ms and reads clearly. 800 to 1100 is ~20ms — one frame at
+   * 60Hz — and is genuinely indistinguishable, tested blind and reported as
+   * such. Past 800 the extra stiffness buys nothing visible and only risks
+   * reading as abrupt on slower hardware, so this takes the LOWEST value that
+   * can't be told apart from the fastest.
+   *
+   * critical at (800, 1) = 56.57
    */
-  sheetPresent: { damping: 44, stiffness: 460, mass: 1 },
+  sheetPresent: { damping: 57, stiffness: 800, mass: 1 },
 
   /** Hold-to-confirm snapping back on early release. critical at (320, 1) = 35.78 */
   confirmCancel: { damping: 38, stiffness: 320, mass: 1 },
