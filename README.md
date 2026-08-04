@@ -20,8 +20,15 @@ Expo · TypeScript · Reanimated · Gesture Handler. Three runtime dependencies,
 
 ## The interruptible sheet
 
-<!-- GIF: sheet.gif — include the mid-flight grab. Nothing else proves the
-     physics are real rather than a canned animation. -->
+<p align="center">
+  <img src="docs/sheet.gif" width="420" alt="A bottom sheet flicked hard, caught in mid-flight, and held still under the thumb">
+</p>
+
+*The sheet is travelling under its own spring when the thumb lands on it, and it
+stops where it was caught — no jump to meet the finger, no stall before it
+follows. The clip finishes by pulling above the tallest detent, where resistance
+grows rather than a wall appearing. Screen recording can't capture the haptic
+that fires on each detent commit, only on arrival and never on crossing.*
 
 **Velocity projection, not thresholds.** Where a flick comes to rest is
 *projected*, then snapped to the nearest detent:
