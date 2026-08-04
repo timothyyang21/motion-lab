@@ -1,10 +1,11 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Dimensions, Platform, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
   useDerivedValue,
+  useAnimatedReaction,
   useAnimatedRef,
   useAnimatedScrollHandler,
   scrollTo,
@@ -86,6 +87,41 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
 
   const atTopDetent = useDerivedValue(() => Math.abs(translateY.value - TOP) < 1);
 
+  /**
+   * The content scrolls at the top detent and nowhere else.
+   *
+   * That was always the intent — below the top detent a vertical drag is meant
+   * to move the SHEET — but it was only ever enforced inside the pan handler,
+   * so it held while a finger was down and lapsed everywhere else. In flight
+   * there is no gesture running, and a list still carrying momentum kept
+   * decelerating behind a sheet that was itself travelling. Two things moving
+   * at once, and no way for the eye to tell which one it should be following.
+   */
+  const [contentScrollable, setContentScrollable] = useState(false);
+
+  useAnimatedReaction(
+    () => atTopDetent.value,
+    (isTop, wasTop) => {
+      if (isTop !== wasTop) {
+        runOnJS(setContentScrollable)(isTop);
+      }
+    },
+  );
+
+  /**
+   * Pin on every frame the sheet moves, not only on gesture frames — this is
+   * the half that covers the flight. Disabling scrolling stops the list taking
+   * NEW input; it doesn't rewind an offset the list had already reached.
+   */
+  useAnimatedReaction(
+    () => translateY.value,
+    () => {
+      if (!atTopDetent.value) {
+        scrollTo(scrollRef, 0, 0, false);
+      }
+    },
+  );
+
   const spring = reduced ? motion.reduced.springs.sheetSettle : motion.springs.sheetSettle;
   // Entering and dismissing cover the full screen height. Settling into a
   // detent covers a couple of hundred points. Same spring for both makes the
@@ -146,12 +182,8 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
         panOwnsGesture.value = true;
       }
 
-      // Pin the content to the top while the sheet itself is moving, so
-      // releasing never strands the list mid-scroll behind a travelling sheet.
-      if (!atTopDetent.value) {
-        scrollTo(scrollRef, 0, 0, false);
-      }
-
+      // Pinning used to live here. It now runs off translateY instead, so it
+      // covers the flight as well as the drag rather than only the drag.
       const raw = gestureStart.value + event.translationY;
 
       if (raw < TOP) {
@@ -260,6 +292,7 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
                * twice in one gesture.
                */
               bounces={false}
+              scrollEnabled={contentScrollable}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}
             >
