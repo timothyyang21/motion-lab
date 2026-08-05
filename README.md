@@ -190,8 +190,6 @@ a half-sine so it has soft edges without a gradient dependency.
 
 ## The rolling number
 
-<!-- GIF: number.gif — a tick and a commit, side by side. -->
-
 One component, two configurations. `tick` is fast, ambient, forgettable by
 design. `commit` is slow, singular, meant to land. Same mechanism, opposite
 emotional job — and the difference is a prop, not a second component.
