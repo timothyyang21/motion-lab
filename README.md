@@ -143,7 +143,16 @@ Verified on device: no stutter frame at the changeover.
 
 ## Hold-to-confirm
 
-<!-- GIF: hold-to-confirm.gif — include one early release. -->
+<p align="center">
+  <img src="docs/hold-to-confirm.gif" width="560" alt="A hold-to-confirm button abandoned partway, then held to completion: fill, morph to Sold, and a shimmer crossing once">
+</p>
+
+*Abandoned first, then committed. Framed tight because the shimmer is illegible
+at full-screen scale — it's fourteen vertical slices on a half-sine, and at
+sweep speed the steps disappear. What you can't see is the haptic, which fires
+40ms before the visual settles; and on the early release it doesn't fire at all,
+because a button that says cancelled while the hand says committed is worse than
+no feedback.*
 
 **Friction at the right moment builds trust.**
 
