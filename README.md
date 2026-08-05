@@ -8,13 +8,19 @@ Expo · TypeScript · Reanimated · Gesture Handler. Three runtime dependencies,
 > financial framing exists because that's where these primitives have to be
 > right — bounce on a screen holding someone's savings reads as toy.
 
-<!-- ============================================================
-     GIF: the full chain, one unbroken gesture.
-     tap a row -> sheet rises -> scroll the detail -> drag down at the
-     top and hand off -> grab it mid-flight -> hold to confirm ->
-     balance falls.
-     MUST include the mid-flight grab.
-     ============================================================ -->
+<p align="center">
+  <img src="docs/chain.gif" width="420" alt="One continuous take: a row tapped, the sheet raised and its detail scrolled, the scroll handed off to the sheet, the sheet caught in mid-flight and thrown to the top, then held down to sell until the balance falls">
+</p>
+
+*One take, no cuts. A row is tapped; the sheet comes up and is dragged to its
+tallest stop; the detail scrolls; the scroll runs out and hands the same drag to
+the sheet; the sheet is flicked and then **caught in mid-air**; thrown back to
+the top; and held down until it sells — and the balance rolls down to meet it.*
+
+*Every primitive in the repo, in one gesture, on a Release build on a phone. The
+haptics aren't in the recording — iOS screen capture doesn't get them — so the
+beat you'd feel at each detent, and again 40ms before the sale lands, is missing
+from what you're looking at.*
 
 ---
 
