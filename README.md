@@ -294,8 +294,26 @@ low-end one that would make the numbers harsher.
 
 ## Try it
 
-<!-- REQUIRED BEFORE APPLYING: Expo QR code + link.
-     No custom native modules, so it runs in Expo Go unmodified. -->
+**On an Android phone**, scan this or open
+[the release](https://github.com/timothyyang21/motion-lab/releases/tag/v1.0.0):
+
+<p align="center">
+  <img src="docs/install.png" width="200" alt="QR code linking to the motion-lab v1.0.0 Android release page">
+</p>
+
+Reading about interruptible motion is a poor substitute for catching a sheet in
+mid-air, so there's a build rather than a description. ~29MB, arm64, release.
+
+Worth knowing before you install it: it's signed with the **Android debug
+keystore** — the React Native template default — so it sideloads but is not a
+Play Store artifact. It's arm64 only. There is no network, no account and no
+analytics; the prices are simulated locally. And it drops ~12.65% of frames
+while idle on a mid-range Android, which is a real, measured, currently-unfixed
+finding written up under [Performance](#performance) rather than hidden.
+
+**No iOS build.** Ad-hoc distribution needs every tester's device registered in
+advance, and TestFlight needs App Store review — neither works for someone who
+just wants a look. On iOS, clone and run it:
 
 ```bash
 npm install
