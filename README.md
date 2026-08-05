@@ -335,10 +335,17 @@ Gesture feel, spring character, and haptic timing are **not** tested, because
 they can't be. Snapshot-testing them would be theatre. They're decided by hand
 on a device, which is the only way that judgment gets made.
 
-That doesn't mean they're decided by vibe. Constants are chosen by comparison
-rather than by assertion: candidates get cycled at runtime on a Release build
-and judged back to back, unlabelled, against a control. Nobody can answer *"does
-460 feel right?"* — everybody can answer *"is 1 or 3 better?"*
+That doesn't mean guessing. **One constant — the sheet's entrance — was decided
+by comparison rather than assertion**: candidates cycled at runtime on a Release
+build and judged back to back, unlabelled, against a control. Nobody can answer
+*"does 460 feel right?"*; everybody can answer *"is 1 or 3 better?"*
+
+**The rest are reasoned, not felt against alternatives**, and it would be easy to
+imply otherwise here. Each carries its argument in
+[`motion.ts`](src/tokens/motion.ts), and several are deliberately below the
+threshold where a comparison would mean anything — the haptic leads the visual by
+40ms, which is one frame at 120Hz, and the digit stagger is 25ms. Running a blind
+A/B on those would produce a shrug and a number nobody could defend.
 
 One result from doing that is worth stating, because it changed the method. For
 a critically damped spring, travel time runs with `1/√stiffness`, so equal steps
