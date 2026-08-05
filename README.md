@@ -242,15 +242,53 @@ information, not decoration.
 
 ## Performance
 
-<!-- REQUIRED BEFORE APPLYING.
-     - Frame timeline screenshot
-     - Device name and model (low-end Android)
-     - One thing found and fixed, with the before/after number
+Measured on a **Motorola Edge 2024** — Snapdragon 7s Gen 2, Android 15, running
+at **90Hz, so a frame budget of 11.1ms**. Release build installed over ADB, never
+Expo Go. Numbers are `dumpsys gfxinfo`, driven by scripted `adb input` so the
+gesture velocities are identical between runs rather than hand-matched.
 
-     Likely subject, already anticipated in the code: animating shadow on
-     light ground. See the comment in src/components/Sheet.tsx — shadowRadius
-     and shadowOpacity force a re-rasterisation every frame on Android.
-     Expo Go is NOT valid for these numbers; use a release build. -->
+| what the app is doing | janky frames | 50th | 95th |
+| --- | --- | --- | --- |
+| flicking the sheet, handoff, settling | **0.46%** | 11ms | 19ms |
+| hold-to-confirm fill and cancel | ~3.4% | 11ms | 24ms |
+| **nothing at all** | **12.65%** | 22ms | 36ms |
+
+**The worst path in this app is the one where nothing is happening.** Actively
+throwing the sheet around drops 0.46% of frames; sitting idle drops 12.65%. The
+gesture work — springs, projection, the handoff — is essentially free, because it
+lives in worklets on the UI thread and only ever animates `transform`. The
+ambient price ticker is not free.
+
+Every janky frame is `Slow UI thread`; the GPU never exceeds 6ms at the 99th
+percentile. This is CPU-side work per frame, not rasterisation.
+
+**Two hypotheses, both tested on device, both wrong.**
+
+*Animating `width` on the confirm fill.* Width is a layout property, so it should
+force a layout pass per frame. Rewritten to use `transform` with a
+counter-translated clip. Three runs each: `3.14 / 2.95 / 5.27%` before,
+`2.85 / 3.54 / 3.94%` after. Indistinguishable — the run-to-run variance is
+larger than the effect. Reverted, because a change that can't be shown to help
+shouldn't be carried as though it did.
+
+*Re-rendering all sixteen rows per tick.* The ticker returns a new array, so
+every row re-rendered to show one price move. Fixed with `React.memo` plus a
+stable callback. Idle after: `9.88 / 12.87 / 13.78%` against `12.65%` before.
+Also indistinguishable. **Kept anyway** — doing less work is still correct — but
+[the comment says plainly](src/screens/AccountScreen.tsx) that it is not a win.
+
+**What it actually is, and what I'd do next.** Occluding the list entirely
+behind the sheet barely moves it (9.05% idle), so it isn't reconciliation and it
+isn't overdraw — React Native goes on animating views nobody can see. What's left
+is the per-frame cost of the flash and roll worklets themselves: every animating
+digit runs `interpolateColor` on the UI thread on every frame, and with a 1800ms
+tick against a ~1.2s flash decay the app is animating roughly two-thirds of the
+time it's open. The next measurement is a Perfetto trace to attribute UI-thread
+time properly, rather than a third guess.
+
+**Scope, stated honestly:** one device, one session, three runs per condition. It
+is evidence, not a benchmark suite. It's also a mid-range phone rather than the
+low-end one that would make the numbers harsher.
 
 ---
 

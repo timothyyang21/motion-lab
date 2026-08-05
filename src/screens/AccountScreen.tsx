@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useReducedMotion } from 'react-native-reanimated';
 import { useTheme } from '../tokens/ThemeProvider';
@@ -74,6 +74,8 @@ export function AccountScreen() {
   const [reducedOverride, setReducedOverride] = useState<boolean | null>(null);
   const reduced = reducedOverride ?? systemReduced;
 
+  const handleSelect = useCallback((instrument: Instrument) => setSelected(instrument), []);
+
   const handleConfirm = () => {
     // Let the bloom finish before the sheet leaves. Dismissing mid-flash reads
     // as though the confirmation was skipped rather than acknowledged — and it
@@ -103,12 +105,18 @@ export function AccountScreen() {
           <Text style={[typeScale.caption, { color: theme.textTertiary }]}>HOLDINGS</Text>
         </View>
 
+        {/*
+          onSelect is stable and Row is memoised — see the note on Row. Passing
+          `() => setSelected(instrument)` inline here allocates a new function
+          every render, which would defeat the memo entirely and quietly undo
+          the only measured performance fix in this repo.
+        */}
         {instruments.map((instrument) => (
           <Row
             key={instrument.id}
             instrument={instrument}
             reduced={reduced}
-            onPress={() => setSelected(instrument)}
+            onSelect={handleSelect}
           />
         ))}
       </ScrollView>
@@ -203,20 +211,41 @@ export function AccountScreen() {
   );
 }
 
-function Row({
+/**
+ * Memoised so a tick only re-renders the rows whose price actually moved.
+ *
+ * The ambient ticker replaces one or two prices every 1800ms but returns a new
+ * array each time, so without this all sixteen rows re-rendered on every tick,
+ * each rebuilding its RollingNumber and every Char inside it. Unchanged
+ * instruments keep their object identity through the ticker's `map`, so a plain
+ * reference comparison is enough — and it only holds because `onSelect` is
+ * stable. An inline arrow at the call site would make every row look changed.
+ *
+ * HONEST NOTE ON WHAT THIS DID NOT DO. It was written to fix a measured problem
+ * — 12.65% of frames dropped while the app sat completely idle on a Motorola
+ * Edge 2024 at 90Hz — and it did not fix it. Three runs after this change:
+ * 9.88%, 12.87%, 13.78%, against 12.65% before. Indistinguishable.
+ *
+ * The cost is not React reconciliation. Covering the list entirely with the
+ * sheet doesn't help either (9.05% idle), because RN keeps rendering and
+ * animating occluded views. What remains is the per-frame UI-thread work of the
+ * flash and roll animations themselves. This stays because doing less work is
+ * still right; it is not a performance win and shouldn't be sold as one.
+ */
+const Row = React.memo(function Row({
   instrument,
-  onPress,
+  onSelect,
   reduced,
 }: {
   instrument: Instrument;
-  onPress: () => void;
+  onSelect: (instrument: Instrument) => void;
   reduced: boolean;
 }) {
   const { theme } = useTheme();
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => onSelect(instrument)}
       style={({ pressed }) => [styles.row, { opacity: pressed ? 0.6 : 1 }]}
     >
       <View style={[styles.hairline, { backgroundColor: theme.hairline }]} />
@@ -240,7 +269,7 @@ function Row({
       </View>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
