@@ -17,6 +17,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { motion } from '../tokens/motion';
+import type { CaptureFlick } from '../dev/captureFlicks';
 import { useTheme } from '../tokens/ThemeProvider';
 import {
   projectDestination,
@@ -59,10 +60,19 @@ type Props = {
   onClose: () => void;
   naive?: boolean;
   reduced?: boolean;
+  /** Capture apparatus. A fixed velocity to settle from — see dev/captureFlicks. */
+  flick?: CaptureFlick | null;
   children?: React.ReactNode;
 };
 
-export function Sheet({ visible, onClose, naive = false, reduced = false, children }: Props) {
+export function Sheet({
+  visible,
+  onClose,
+  naive = false,
+  reduced = false,
+  flick = null,
+  children,
+}: Props) {
   const { theme } = useTheme();
 
   const translateY = useSharedValue(CLOSED);
@@ -144,6 +154,64 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  /**
+   * The whole argument, and the only place a detent target is ever chosen.
+   *
+   * Factored out of onEnd so a fixed velocity can be fed in from dev/captureFlicks.
+   * The gesture path and the synthetic path run byte-identical code — which is
+   * the only reason a synthetic flick is worth anything as evidence.
+   */
+  const settleFrom = (velocityY: number) => {
+    'worklet';
+    // Tuned: project where this flick would come to rest, then snap to the
+    // detent nearest THAT. A hard throw lands somewhere different from a
+    // gentle nudge, because it should.
+    //
+    // Naive: cross a velocity threshold, move exactly one detent. A hard
+    // throw and a gentle nudge land identically, which is what feels wrong.
+    const target = naive
+      ? thresholdDetent(translateY.value, velocityY, STOPS)
+      : nearestDetent(
+          projectDestination(translateY.value, velocityY, motion.decelerationRate),
+          STOPS,
+        );
+
+    // Haptic on detent COMMIT only — never on crossing. Crossing haptics
+    // turn a drag into a cattle grid.
+    if (target !== lastDetent.value) {
+      lastDetent.value = target;
+      runOnJS(fireHaptic)();
+    }
+
+    if (target === CLOSED) {
+      runOnJS(onClose)();
+    }
+
+    // Pass the release velocity into the spring so the animation continues
+    // the finger's motion instead of starting a new one from rest.
+    translateY.value = withSpring(target, { ...spring, velocity: velocityY });
+  };
+
+  // Mirrors the prop onto the UI thread so a synthetic flick runs through
+  // settleFrom exactly as a real release does. No second code path.
+  const flickVelocity = useSharedValue(0);
+  const flickNonce = useSharedValue(0);
+
+  useEffect(() => {
+    if (!flick) return;
+    flickVelocity.value = flick.velocity;
+    flickNonce.value = flick.nonce;
+  }, [flick, flickVelocity, flickNonce]);
+
+  useAnimatedReaction(
+    () => flickNonce.value,
+    (now, before) => {
+      if (before === null || now === before || now === 0) return;
+      cancelAnimation(translateY);
+      settleFrom(flickVelocity.value);
+    },
+  );
+
   const nativeScroll = Gesture.Native();
 
   const pan = Gesture.Pan()
@@ -199,36 +267,7 @@ export function Sheet({ visible, onClose, naive = false, reduced = false, childr
       // Snapping detents off it would fight the user's scroll momentum.
       if (!panOwnsGesture.value) return;
       panOwnsGesture.value = false;
-
-      // The whole argument, in four lines.
-      //
-      // Tuned: project where this flick would come to rest, then snap to the
-      // detent nearest THAT. A hard throw lands somewhere different from a
-      // gentle nudge, because it should.
-      //
-      // Naive: cross a velocity threshold, move exactly one detent. A hard
-      // throw and a gentle nudge land identically, which is what feels wrong.
-      const target = naive
-        ? thresholdDetent(translateY.value, event.velocityY, STOPS)
-        : nearestDetent(
-            projectDestination(translateY.value, event.velocityY, motion.decelerationRate),
-            STOPS,
-          );
-
-      // Haptic on detent COMMIT only — never on crossing. Crossing haptics
-      // turn a drag into a cattle grid.
-      if (target !== lastDetent.value) {
-        lastDetent.value = target;
-        runOnJS(fireHaptic)();
-      }
-
-      if (target === CLOSED) {
-        runOnJS(onClose)();
-      }
-
-      // Pass the release velocity into the spring so the animation continues
-      // the finger's motion instead of starting a new one from rest.
-      translateY.value = withSpring(target, { ...spring, velocity: event.velocityY });
+      settleFrom(event.velocityY);
     });
 
   const sheetStyle = useAnimatedStyle(() => ({

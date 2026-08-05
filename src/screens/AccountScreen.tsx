@@ -8,6 +8,7 @@ import { RollingNumber } from '../components/RollingNumber';
 import { Sheet } from '../components/Sheet';
 import { HoldToConfirm } from '../components/HoldToConfirm';
 import { useTickingPrices, type Instrument } from '../data/instruments';
+import { captureFlicks, type CaptureFlick, type FlickKind } from '../dev/captureFlicks';
 
 const BALANCE = 128420.55;
 
@@ -57,6 +58,15 @@ export function AccountScreen() {
   const [selected, setSelected] = useState<Instrument | null>(null);
   const [balance, setBalance] = useState(BALANCE);
   const [naive, setNaive] = useState(false);
+
+  // The nonce is what makes two identical velocities in a row still register
+  // as two separate events.
+  const [flick, setFlick] = useState<CaptureFlick | null>(null);
+  const doFlick = (which: FlickKind) =>
+    setFlick((previous) => ({
+      velocity: captureFlicks[which],
+      nonce: (previous?.nonce ?? 0) + 1,
+    }));
 
   // The system setting is the source of truth; the toggle overrides it so the
   // behaviour is capturable without digging through Accessibility settings.
@@ -108,6 +118,7 @@ export function AccountScreen() {
         onClose={() => setSelected(null)}
         naive={naive}
         reduced={reduced}
+        flick={flick}
       >
         <View style={styles.sheetContent}>
           <Text style={[typeScale.sheetTitle, { color: theme.textPrimary }]}>
@@ -186,6 +197,7 @@ export function AccountScreen() {
         onToggleNaive={() => setNaive((v) => !v)}
         reduced={reduced}
         onToggleReduced={() => setReducedOverride(!reduced)}
+        onFlick={doFlick}
       />
     </View>
   );

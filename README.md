@@ -78,14 +78,32 @@ to show.
 
 ## Naive vs. tuned
 
-<!-- GIF: naive-vs-tuned.gif — side by side, same flick strength both sides.
-     Both runs must start from the MIDDLE detent, where the two algorithms
-     actually disagree. Keep the MODE row in frame and tap it on camera; it's
-     the evidence this is one build. The dev panel opens from the faint dot at
-     the top right. -->
+<p align="center">
+  <img src="docs/naive-vs-tuned.gif" width="420" alt="The same two flick velocities fired under both algorithms: tuned separates them, naive collapses them">
+</p>
 
-Same build, same device, same hand — [toggled at runtime](src/dev/DevBar.tsx) so
-there's no question of it being two different apps.
+|           | soft flick | hard flick |
+| --------- | ---------- | ---------- |
+| **tuned** | middle     | **top**    |
+| **naive** | middle     | middle     |
+
+One recording, no cut. The `MODE` chip flips from `TUNED` to `NAIVE` halfway
+through, which is what makes this one build rather than two takes edited
+together — [toggled at runtime](src/dev/DevBar.tsx).
+
+**The flicks are synthetic, and that's the point.** Both are fired at fixed
+velocities from the dev panel — 700 and 2600 px/s — rather than by thumb. A hand
+varies two things at once: a harder flick also *drags the sheet further before
+release*, and the naive algorithm snaps one detent from wherever the finger let
+go. So a human hard throw climbs two stops — one from the drag, one from the
+threshold — and both algorithms land in the same place, for reasons that have
+nothing to do with either algorithm. Holding position fixed and varying only
+velocity is the only way this measures the thing it claims to.
+
+The synthetic path calls the same `settleFrom(velocity)` the real gesture does.
+It supplies a number where a thumb would have; there is no second code path, and
+[a test](__tests__/projection.test.ts) asserts all four cells of that table
+before anyone points a camera at it.
 
 ---
 

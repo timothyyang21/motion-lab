@@ -107,3 +107,42 @@ describe('rubberBand', () => {
     }
   });
 });
+
+describe('the naive-vs-tuned capture', () => {
+  // CAPTURE SCAFFOLD — temporary, alongside src/dev/captureFlicks.ts.
+  //
+  // The comparison GIF is a controlled experiment, so its outcome should be a
+  // prediction that holds before anyone points a camera at it — not something
+  // discovered on the ninth take. These are the real detents on the capture
+  // device, and the two velocities the dev panel fires.
+  const H = 874;
+  const STOPS = [0.28, 0.58, 0.92]
+    .map((fraction) => H * (1 - fraction))
+    .sort((a, b) => a - b)
+    .concat(H);
+
+  const [TOP, MIDDLE, BOTTOM] = STOPS;
+  const SOFT = -700;
+  const HARD = -2600;
+
+  const tuned = (velocity: number) =>
+    nearestDetent(projectDestination(BOTTOM, velocity, 0.998), STOPS);
+  const naive = (velocity: number) => thresholdDetent(BOTTOM, velocity, STOPS);
+
+  it('tuned sends a hard flick further than a soft one', () => {
+    expect(tuned(SOFT)).toBe(MIDDLE);
+    expect(tuned(HARD)).toBe(TOP);
+  });
+
+  it('naive cannot tell them apart — one stop either way', () => {
+    expect(naive(SOFT)).toBe(MIDDLE);
+    expect(naive(HARD)).toBe(MIDDLE);
+  });
+
+  it('both velocities clear the naive threshold, so naive treats them as one event', () => {
+    // If either fell below 500, naive would simply not move, which reads as a
+    // broken app rather than as a coarser algorithm — and proves nothing.
+    expect(Math.abs(SOFT)).toBeGreaterThan(500);
+    expect(Math.abs(HARD)).toBeGreaterThan(500);
+  });
+});

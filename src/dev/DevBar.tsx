@@ -2,20 +2,27 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../tokens/ThemeProvider';
 import { typeScale } from '../tokens/theme';
+import type { FlickKind } from './captureFlicks';
 
 type Props = {
   naive: boolean;
   onToggleNaive: () => void;
   reduced: boolean;
   onToggleReduced: () => void;
+  /** Fires a fixed-velocity flick. See dev/captureFlicks. */
+  onFlick: (which: FlickKind) => void;
 };
 
 /**
  * A capture affordance, not a feature.
  *
  * The naive/tuned toggle means the README's side-by-side comparison is provably
- * the same build, the same device, and the same hand — and capture day becomes
- * record-flip-record rather than record-edit-rebuild-record.
+ * the same build and the same device — and capture day becomes record-flip-record
+ * rather than record-edit-rebuild-record.
+ *
+ * Not "the same hand", which is what this used to claim. A hand cannot repeat a
+ * velocity, so the FLICK row fires fixed ones instead; see captureFlicks.ts.
+ * That is a stronger guarantee than a steady thumb, not a weaker one.
  *
  * CLOSED BY DEFAULT. It used to open as a row of chips pinned over the top of
  * the screen, which cost twice: it covered the sheet's title whenever the sheet
@@ -34,7 +41,13 @@ type Props = {
  * is ambiguous in a still frame, which is the single thing this exists to
  * survive. Chips share a minimum width so toggling never re-flows the panel.
  */
-export function DevBar({ naive, onToggleNaive, reduced, onToggleReduced }: Props) {
+export function DevBar({
+  naive,
+  onToggleNaive,
+  reduced,
+  onToggleReduced,
+  onFlick,
+}: Props) {
   const { theme, scheme, setOverride } = useTheme();
   const [open, setOpen] = useState(false);
 
@@ -70,6 +83,36 @@ export function DevBar({ naive, onToggleNaive, reduced, onToggleReduced }: Props
         active={reduced}
         onPress={onToggleReduced}
       />
+      {/*
+        Two fixed velocities, so the naive/tuned comparison varies the
+        algorithm and nothing else. See captureFlicks.ts for why a human thumb
+        cannot do this job.
+      */}
+      <View style={styles.settingRow}>
+        <Text style={[typeScale.caption, { color: theme.textTertiary }]}>FLICK</Text>
+        <View style={styles.flickPair}>
+          {/*
+            These are verbs, like HIDE — they do a thing rather than name a
+            state, so they never fill. A filled button reads as a mode that is
+            currently selected, which is not what tapping one does.
+          */}
+          {(['soft', 'hard'] as const).map((kind) => (
+            <Pressable
+              key={kind}
+              onPress={() => onFlick(kind)}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.chipNarrow,
+                { borderColor: theme.hairline, opacity: pressed ? 0.6 : 1 },
+              ]}
+            >
+              <Text style={[typeScale.caption, { color: theme.textTertiary }]}>
+                {kind.toUpperCase()}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      </View>
       <Pressable
         onPress={() => setOpen(false)}
         hitSlop={8}
@@ -155,6 +198,15 @@ const styles = StyleSheet.create({
      * the shorter values now sit in a box built for a longer one.
      */
     minWidth: 76,
+    alignItems: 'center',
+  },
+  flickPair: { flexDirection: 'row', gap: 6 },
+  chipNarrow: {
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: StyleSheet.hairlineWidth,
+    minWidth: 46,
     alignItems: 'center',
   },
   close: {
